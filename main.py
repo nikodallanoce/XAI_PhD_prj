@@ -69,13 +69,14 @@ if __name__ == '__main__':
 
     # show_batch(train_dl)
 
-    # model = ResNet9(in_channels=3, num_diseases=len(train.classes))
+    #model = ResNet9(in_channels=3, num_diseases=len(train.classes))
     model = CustomEfficientNet(num_diseases=len(train.classes), weights=None)
     # model = ResNetCustom(num_classes=len(train.classes))
-    compiled_model = torch.compile(model, mode="max-autotune")
+
     trainer = Trainer(accelerator="auto", devices="auto", precision="16-mixed", max_epochs=50,
                       accumulate_grad_batches=2,
-                      logger=WandbLogger(name="EfficientNet_scratch", project="XAI", log_model=False), log_every_n_steps=10,
+                      logger=WandbLogger(name="EfficientNet_scratch", project="XAI", log_model=False),
+                      log_every_n_steps=10,
                       gradient_clip_val=1,
                       enable_progress_bar=True, callbacks=[checkpoint, lr_monitor, early_stop])
     trainer.fit(model, train_dl, valid_dl)
