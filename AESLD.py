@@ -1,13 +1,7 @@
-from typing import Any
-
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torchvision.datasets as datasets
-import torchvision.transforms as transforms
 from lightning.pytorch import LightningModule
-from lightning.pytorch.utilities.types import STEP_OUTPUT
 from XAI_course_2024.externals.ABELE.autoencoders.autoencoder import Autoencoder
 import torch.nn.functional as F
 
@@ -19,14 +13,14 @@ class Encoder(nn.Module):
         self.conv2 = nn.Conv2d(32, 32, 3, stride=2, padding=1)
         self.conv3 = nn.Conv2d(32, 64, 3, stride=2, padding=1)
         self.conv4 = nn.Conv2d(64, 64, 3, stride=2, padding=1)
-        #self.flatten = nn.Flatten()
+        # self.flatten = nn.Flatten()
 
     def forward(self, x):
         x1 = F.gelu(self.conv1(x))
         x2 = F.gelu(self.conv2(x1))
         x3 = F.gelu(self.conv3(x2))
         x4 = F.gelu(self.conv4(x3))
-        #x4 = self.flatten(x4)
+        # x4 = self.flatten(x4)
         return x4
 
 
@@ -130,7 +124,6 @@ class AE(LightningModule, Autoencoder):
                                                                T_max=self.trainer.estimated_stepping_batches + 1,
                                                                eta_min=1e-5)
         return [optimizer], [{"scheduler": scheduler, "interval": "step"}]
-
 
 # if __name__ == "__main__":
 #     device = "cuda" if torch.cuda.is_available() else "cpu"
