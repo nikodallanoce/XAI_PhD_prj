@@ -3,8 +3,7 @@ from typing import Any
 import torch
 import torch.nn.functional as F
 from lightning.pytorch import LightningModule
-from lightning.pytorch.utilities.types import STEP_OUTPUT
-from torchmetrics import Accuracy, MeanMetric
+from torchmetrics import Accuracy, MeanMetric, ConfusionMatrix
 from torchvision.models import EfficientNet, efficientnet_b0
 
 
@@ -20,24 +19,18 @@ class CustomEfficientNet(LightningModule):
         self.model = model
         self.train_accuracy = Accuracy("multiclass", num_classes=num_diseases)
         self.valid_accuracy = Accuracy("multiclass", num_classes=num_diseases)
+        self.conf_matrix = ConfusionMatrix("multiclass", num_classes=num_diseases)
         self.mean = MeanMetric()
-        # self.train_accuracy = Accuracy("multiclass", num_classes=num_diseases)
         self.save_hyperparameters()
 
     def configure_optimizers(self):
-        # return [self.optimizer(self.parameters(), self.lr)], [
-        #     {"scheduler": self.lr_scheduler(self.optimizer, self.lr,
-        #                                     self.trainer.estimated_stepping_batches), "interval": "step"}]
-        lr = 0.8e-3
+        lr = 8e-4
         optimizer = torch.optim.Adam(self.parameters(), lr=lr, weight_decay=1e-5)
-        # optimizer = torch.optim.RMSprop(self.parameters(), lr=lr, momentum=0.89, weight_decay=1e-5)
 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer,
                                                                T_max=self.trainer.estimated_stepping_batches + 1,
                                                                eta_min=1e-5)
-        # scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer,
-        #                                                        T_0=(self.trainer.estimated_stepping_batches + 1)//2)
-        # scheduler = torch.optim.lr_scheduler.ConstantLR(optimizer)
+
         return [optimizer], [{"scheduler": scheduler, "interval": "step"}]
 
     def training_step(self, batch):
@@ -54,15 +47,16 @@ class CustomEfficientNet(LightningModule):
     def forward(self, batch) -> Any:
         return self.model(batch)
 
-    # def on_train_batch_end(self, outputs: STEP_OUTPUT, batch: Any, batch_idx: int) -> None:
-    #     self.lr_schedulers().step()
-
-    # def on_train_epoch_end(self) -> None:
-    #     self.log("train/accuracy", self.train_accuracy, sync_dist=True)
-    #     self.train_accuracy.reset()
-
     def test_step(self, batch):
-        self.validation_step(batch)
+        images, labels = batch
+        out = self.model(images)  # Generate prediction
+        # classes = torch.argmax(out, dim=1)
+        loss = F.cross_entropy(out, labels)  # Calculate loss
+        acc = self.valid_accuracy(out, labels)
+        self.conf_matrix(out, labels)
+        self.log("test/loss", loss, sync_dist=True)
+        self.log("test/accuracy", acc, sync_dist=True)
+        return {"loss": loss, "accuracy": acc}
 
     def validation_step(self, batch):
         images, labels = batch
@@ -72,4 +66,3 @@ class CustomEfficientNet(LightningModule):
         self.log("val/loss", loss, sync_dist=True)
         self.log("val/accuracy", acc, sync_dist=True, prog_bar=True, on_step=False, on_epoch=True)
         return {"loss": loss, "accuracy": acc}
-        # return {"loss": loss}
